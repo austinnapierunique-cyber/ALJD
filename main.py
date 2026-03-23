@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
 import os
@@ -13,7 +12,7 @@ class Message(BaseModel):
     text: str
     conversation_id: Optional[str] = "default"
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 def home():
     return {"status": "ALJD is running!"}
 
