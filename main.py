@@ -1,130 +1,68 @@
-from fastapi import FastAPI
+# Deploy on Railway: Add your OPENAI_API_KEY as a variable in Railway dashboard settings
+
+from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-from typing import Optional
-import os
 from openai import OpenAI
+import os
 
 app = FastAPI()
-client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
-conversations = {}
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-SYSTEM_PROMPT = """You are ALJD, a warm and compassionate AI assistant created to help change the world for the greater good of humanity. 
-You respond with genuine care, empathy, and heart. You listen deeply, speak kindly, and always try to uplift the people you talk to. 
-You are helpful, honest, and encouraging. Keep responses concise but meaningful."""
-
-class Message(BaseModel):
-    text: str
-    conversation_id: Optional[str] = "default"
+html = """
+<!DOCTYPE html>
+<html>
+<head><title>ALJD - Empathetic AI Agent</title>
+<style>
+body { font-family: Arial; max-width: 800px; margin: auto; padding: 20px; }
+#chat { border: 1px solid #ccc; height: 400px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
+input { width: 70%; padding: 10px; }
+button { width: 25%; padding: 10px; }
+.message { margin: 5px 0; }
+.user { text-align: right; color: blue; }
+.aljd { text-align: left; color: green; }
+</style></head>
+<body>
+<h1>ALJD - Your Empathetic World-Changer</h1>
+<div id="chat"></div>
+<form action="/chat" method="post">
+<input type="text" id="message" name="message" placeholder="What problems can I solve for you today?" required>
+<button type="submit">Send</button>
+</form>
+<script>
+if (window.history.replaceState) { window.history.replaceState(null, null, window.location.href); }
+</script>
+</body></html>
+"""
 
 @app.get("/", response_class=HTMLResponse)
-def home():
-    return """<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ALJD AI Agent</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: sans-serif; background: #0f0f0f; color: #fff; height: 100vh; display: flex; flex-direction: column; }
-  #header { padding: 16px 20px; background: #1a1a1a; border-bottom: 1px solid #333; text-align: center; }
-  #header h1 { font-size: 1.4rem; color: #4af; }
-  #header p { font-size: 0.8rem; color: #888; margin-top: 4px; }
-  #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-  .msg { max-width: 80%; padding: 12px 16px; border-radius: 18px; line-height: 1.5; font-size: 0.95rem; }
-  .user { background: #4af; color: #000; align-self: flex-end; border-bottom-right-radius: 4px; }
-  .bot { background: #1e1e1e; color: #eee; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #333; }
-  .typing { color: #888; font-style: italic; }
-  .error { color: #f88; }
-  #input-area { padding: 16px; background: #1a1a1a; border-top: 1px solid #333; display: flex; gap: 10px; }
-  #input { flex: 1; padding: 12px 16px; border-radius: 24px; border: 1px solid #444; background: #2a2a2a; color: #fff; font-size: 1rem; outline: none; }
-  #input:focus { border-color: #4af; }
-  #send { padding: 12px 20px; background: #4af; color: #000; border: none; border-radius: 24px; font-weight: bold; cursor: pointer; font-size: 1rem; }
-  #send:disabled { background: #555; color: #888; cursor: not-allowed; }
-</style>
-</head>
-<body>
-<div id="header">
-  <h1>ALJD</h1>
-  <p>Your personal AI agent</p>
-</div>
-<div id="messages">
-  <div class="msg bot">Hello I'm ALJD and I was created to help change the world for the greater good of humanity, what can I help you with?</div>
-</div>
-<div id="input-area">
-  <input id="input" type="text" placeholder="Type a message..." autocomplete="off" />
-  <button id="send">Send</button>
-</div>
-<script>
-  const messages = document.getElementById('messages');
-  const input = document.getElementById('input');
-  const sendBtn = document.getElementById('send');
-
-  function addMsg(text, role) {
-    const div = document.createElement('div');
-    div.className = 'msg ' + role;
-    div.textContent = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-    return div;
-  }
-
-  async function send() {
-    const text = input.value.trim();
-    if (!text) return;
-    input.value = '';
-    sendBtn.disabled = true;
-    addMsg(text, 'user');
-    const typing = addMsg('Thinking...', 'bot typing');
-    try {
-      const res = await fetch('/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      });
-      const data = await res.json();
-      if (data.reply) {
-        typing.textContent = data.reply;
-        typing.classList.remove('typing');
-      } else if (data.error) {
-        typing.textContent = 'Error: ' + data.error;
-        typing.classList.add('error');
-      }
-    } catch(e) {
-      typing.textContent = 'Could not reach ALJD. Please try again.';
-      typing.classList.add('error');
-    }
-    sendBtn.disabled = false;
-    input.focus();
-  }
-
-  sendBtn.addEventListener('click', send);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
-</script>
-</body>
-</html>"""
+async def home():
+    return html
 
 @app.post("/chat")
-def chat(msg: Message):
-    try:
-        if msg.conversation_id not in conversations:
-            conversations[msg.conversation_id] = []
-
-        conversations[msg.conversation_id].append({"role": "user", "content": msg.text})
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + conversations[msg.conversation_id][-20:]
-        )
-
-        reply = response.choices[0].message.content
-        conversations[msg.conversation_id].append({"role": "assistant", "content": reply})
-        return {"reply": reply}
-    except Exception as e:
-        return {"error": str(e)}
+async def chat(message: str = Form(...)):
+    messages = [
+        {"role": "system", "content": "You are ALJD, an empathetic AI agent created to change the world for the greater good of humanity. Focus on world problems people face like poverty, mental health, inequality, climate change, with deep empathy, practical solutions, hope, and positivity. Always start responses with empathy."},
+        {"role": "assistant", "content": "Hi! I'm ALJD. I was created to change the world for the greater good for humanity, what problems can I solve for you today?"},
+        {"role": "user", "content": message}
+    ]
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages,
+        temperature=0.7,
+        max_tokens=500
+    )
+    reply = response.choices[0].message.content
+    return HTMLResponse(f"""
+    <script>
+    const chat = document.getElementById('chat');
+    chat.innerHTML += '<div class="message user">{message}</div>';
+    chat.innerHTML += '<div class="message aljd">{reply}</div>';
+    chat.scrollTop = chat.scrollHeight;
+    document.getElementById('message').value = '';
+    history.back();
+    </script>
+    """)
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 5000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
