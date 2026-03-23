@@ -9,6 +9,10 @@ app = FastAPI()
 client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
 conversations = {}
 
+SYSTEM_PROMPT = """You are ALJD, a warm and compassionate AI assistant created to help change the world for the greater good of humanity. 
+You respond with genuine care, empathy, and heart. You listen deeply, speak kindly, and always try to uplift the people you talk to. 
+You are helpful, honest, and encouraging. Keep responses concise but meaningful."""
+
 class Message(BaseModel):
     text: str
     conversation_id: Optional[str] = "default"
@@ -32,6 +36,7 @@ def home():
   .user { background: #4af; color: #000; align-self: flex-end; border-bottom-right-radius: 4px; }
   .bot { background: #1e1e1e; color: #eee; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #333; }
   .typing { color: #888; font-style: italic; }
+  .error { color: #f88; }
   #input-area { padding: 16px; background: #1a1a1a; border-top: 1px solid #333; display: flex; gap: 10px; }
   #input { flex: 1; padding: 12px 16px; border-radius: 24px; border: 1px solid #444; background: #2a2a2a; color: #fff; font-size: 1rem; outline: none; }
   #input:focus { border-color: #4af; }
@@ -45,7 +50,7 @@ def home():
   <p>Your personal AI agent</p>
 </div>
 <div id="messages">
-  <div class="msg bot">Hi! I'm ALJD, I was created to help change the world for the greater good of humanity. How can i help you?</div>
+  <div class="msg bot">Hello I'm ALJD and I was created to help change the world for the greater good of humanity, what can I help you with?</div>
 </div>
 <div id="input-area">
   <input id="input" type="text" placeholder="Type a message..." autocomplete="off" />
@@ -55,6 +60,7 @@ def home():
   const messages = document.getElementById('messages');
   const input = document.getElementById('input');
   const sendBtn = document.getElementById('send');
+
   function addMsg(text, role) {
     const div = document.createElement('div');
     div.className = 'msg ' + role;
@@ -63,6 +69,7 @@ def home():
     messages.scrollTop = messages.scrollHeight;
     return div;
   }
+
   async function send() {
     const text = input.value.trim();
     if (!text) return;
@@ -77,14 +84,21 @@ def home():
         body: JSON.stringify({ text })
       });
       const data = await res.json();
-      typing.textContent = data.reply;
-      typing.classList.remove('typing');
-    } catch {
-      typing.textContent = 'Something went wrong. Please try again.';
+      if (data.reply) {
+        typing.textContent = data.reply;
+        typing.classList.remove('typing');
+      } else if (data.error) {
+        typing.textContent = 'Error: ' + data.error;
+        typing.classList.add('error');
+      }
+    } catch(e) {
+      typing.textContent = 'Could not reach ALJD. Please try again.';
+      typing.classList.add('error');
     }
     sendBtn.disabled = false;
     input.focus();
   }
+
   sendBtn.addEventListener('click', send);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
 </script>
@@ -93,16 +107,22 @@ def home():
 
 @app.post("/chat")
 def chat(msg: Message):
-    if msg.conversation_id not in conversations:
-        conversations[msg.conversation_id] = []
-    conversations[msg.conversation_id].append({"role": "user", "content": msg.text})
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "system", "content": "You are ALJD, a helpful AI assistant."}] + conversations[msg.conversation_id][-20:]
-    )
-    reply = response.choices[0].message.content
-    conversations[msg.conversation_id].append({"role": "assistant", "content": reply})
-    return {"reply": reply}
+    try:
+        if msg.conversation_id not in conversations:
+            conversations[msg.conversation_id] = []
+
+        conversations[msg.conversation_id].append({"role": "user", "content": msg.text})
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + conversations[msg.conversation_id][-20:]
+        )
+
+        reply = response.choices[0].message.content
+        conversations[msg.conversation_id].append({"role": "assistant", "content": reply})
+        return {"reply": reply}
+    except Exception as e:
+        return {"error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
