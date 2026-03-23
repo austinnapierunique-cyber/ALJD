@@ -45,7 +45,7 @@ def home():
   <p>Your personal AI agent</p>
 </div>
 <div id="messages">
-  <div class="msg bot">Hi! I'm ALJD, your personal AI assistant. How can I help you today?</div>
+  <div class="msg bot">Hi! I'm ALJD, I was created to help change the world for the greater good of humanity. How can i help you?</div>
 </div>
 <div id="input-area">
   <input id="input" type="text" placeholder="Type a message..." autocomplete="off" />
